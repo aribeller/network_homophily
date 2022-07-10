@@ -11,18 +11,19 @@ from collections import Counter
 # Constants
 ################################################################
 CLASS = 'm'
-LABELS = [0,1] # 0 majority, 1 minority
-GROUPS = ['M', 'm']
+LABELS = [0,1,2] # 0 for majority, minority 1, minority 2
+GROUPS = ['M', 'm1', 'm2']
 EPSILON = 0.00001
 
 ################################################################
 # Functions
 ################################################################
 
-def DPAH(N, fm, d, plo_M, plo_m, h_MM, h_mm, verbose=False, seed=None):
+def DPAH(N, d, fm1, fm2, plo_M, plo_m1, plo_m2, h, verbose=False, seed=None):
     '''
     Generates a Directed Barabasi-Albert Homophilic network.
     - param N: number of nodes
+    - param d: max edge density
     - param fm: fraction of minorities
     - param plo_M: power-law outdegree distribution majority class
     - param plo_m: power-law outdegree distribution minority class
@@ -35,7 +36,7 @@ def DPAH(N, fm, d, plo_M, plo_m, h_MM, h_mm, verbose=False, seed=None):
     start_time = time.time()
 
     # 1. Init nodes
-    nodes, labels, NM, Nm = _init_nodes(N,fm)
+    nodes, labels, NM, Nm1, Nm2 = _init_nodes(N,fm1,fm2)
 
     # 2. Init Directed Graph
     G = nx.DiGraph()
@@ -49,23 +50,21 @@ def DPAH(N, fm, d, plo_M, plo_m, h_MM, h_mm, verbose=False, seed=None):
 
     # 4. Init Activity (out-degree)
     act_M = powerlaw.Power_Law(parameters=[plo_M], discrete=True).generate_random(NM)
-    act_m = powerlaw.Power_Law(parameters=[plo_m], discrete=True).generate_random(Nm)
-    activity = np.append(act_M, act_m)
+    act_m1 = powerlaw.Power_Law(parameters=[plo_m1], discrete=True).generate_random(Nm1)
+    act_m2 = powerlaw.Power_Law(parameters=[plo_m2], discrete=True).generate_random(Nm2)
+    activity = np.concatenate([act_M, act_m1, act_m2])
     activity /= activity.sum()
 
     # 5. Init homophily
-    h_mm = EPSILON if h_mm == 0 else h_mm
-    h_MM = EPSILON if h_MM == 0 else h_MM
-    homophily = np.array([[h_MM, 1-h_MM],[1-h_mm, h_mm]])
+    homophily = np.array([[EPSILON if h_val == 0 else h_val for h_val in h[i]] for i in range(len(h))])
 
     # INIT SUMMARY
     if verbose:
         print("Directed Graph:")
-        print("N={} (M={}, m={})".format(N, NM, Nm))
+        print("N={} (NM={}, Nm1={}, Nm2={})".format(N, NM, Nm1, Nm2))
         print("E={} (d={})".format(E, d))
-        print("Activity Power-Law outdegree: M={}, m={}".format(plo_M, plo_m))
-        print("Homophily: h_MM={}, h_mm={}".format(h_MM, h_mm))
-        print(homophily)
+        print("Activity Power-Law outdegree: M={}, m1={}, m2={}".format(plo_M, plo_m1, plo_m2))
+        print("Homophily (M, m1, m2 x M, m1, m2):\n{}".format(homophily))
         print('')
 
     # 5. Generative process
@@ -91,13 +90,14 @@ def DPAH(N, fm, d, plo_M, plo_m, h_MM, h_mm, verbose=False, seed=None):
         if verbose:
             ls = labels[source]
             lt = labels[target]
-            print("{}->{} ({}{}): {}".format(ns, nt, 'm' if ls else 'M', 'm' if lt else 'M', G.number_of_edges()))
+            print("{}->{} ({}{}): {}".format(ns, nt, str(ls) if ls>0 else 'M', str(lt) if lt>0 else 'M',
+                                             G.number_of_edges()))
 
         if tries > G.number_of_nodes():
             # it does not find any more new connections
-            print("\nEdge density ({}) might differ from {}. N{} fm{} seed{} hMM{} hmm{}\n".format(round(nx.density(G),5),
-                                                                                                round(d,5),N,fm,seed,
-                                                                                                h_MM,h_mm))
+            print("\nEdge density ({}) might differ from {}. N{} fm1{} fm2() seed{}\n".format(round(nx.density(G),5),
+                                                                                              round(d,5),N,fm1, fm2,
+                                                                                              seed))
             break
 
     duration = time.time() - start_time
@@ -122,17 +122,28 @@ def DPAH(N, fm, d, plo_M, plo_m, h_MM, h_mm, verbose=False, seed=None):
 
     return G
 
-def _init_nodes(N, fm):
+def _init_nodes(N, fm1, fm2):
     '''
     Generates random nodes, and assigns them a binary label.
     param N: number of nodes
-    param fm: fraction of minorities
+    param fm1: fraction of minority 1
+    param fm2: fraction of minority 2
     '''
+
     nodes = np.arange(N)
     np.random.shuffle(nodes)
-    majority = int(round(N*(1-fm)))
-    labels = [LABELS[i >= majority] for i,n in enumerate(nodes)]
-    return nodes, labels, majority, N-majority
+    Nm1 = int(round(N*(fm1)))
+    Nm2 = int(round(N*(fm2)))
+    NM = N - Nm1 - Nm2
+    labels = np.empty((N), dtype=int)
+    for i in range(NM):
+        labels[i] = LABELS[0]
+    for i in range(NM, NM+Nm1):
+        labels[i] = LABELS[1]
+    for i in range(NM+Nm1, N):
+        labels[i] = LABELS[2]
+
+    return nodes, labels, NM, Nm1, Nm2
 
 def _pick_source(N,activity):
     '''
@@ -152,6 +163,7 @@ def _pick_target(source, N, labels, indegrees, outdegrees, homophily):
         return None
 
     probs = np.array([ homophily[labels[source],labels[n]] * (indegrees[n]+1) for n in targets])
+
     probs /= probs.sum()
     return np.random.choice(a=targets,size=1,replace=True,p=probs)[0]
 
@@ -161,12 +173,14 @@ def _pick_target(source, N, labels, indegrees, outdegrees, homophily):
 
 if __name__ == "__main__":
 
-    G = DPAH(N=1000,
-             fm=0.5,
+    G = DPAH(N=100,
+             fm1=0.25,
+             fm2=0.25,
              d=0.01,
              plo_M=2.5,
-             plo_m=2.5,
-             h_MM=0.5,
-             h_mm=0.5,
-             verbose=True)
+             plo_m1=2.5,
+             plo_m2=2.5,
+             h=np.ones((3,3)),
+             verbose=True,
+             seed=1)
 
