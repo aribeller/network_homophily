@@ -1,0 +1,90 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+Analyzing the top different top 5 percentages in the original setup with
+homophily of majorities and minorities of 0.8 towards ingroup and 0.2 towards the 
+outgroup. We introduce either a share of majority as allies (majority members
+who are treated as the majority by others, but prefer the minority group at the
+expense of the majority group); or "invisible" minorities (minority members who
+are treated as the majority by the majority and minority groups, but they
+act as minority groups themselves).
+
+First, load some packages:
+```{r message = F, warning = F}
+library(readr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library()
+```
+
+Read in the files:
+```{r message = F, warning = F}
+sweep_allies <- read_csv("../..//python/group_A/results/ally_sweep_per_top_k_100_reps.csv")
+sweep_allies$prop_ally <- round(sweep_allies$prop_ally, 2)
+
+
+sweep_covert <-  read_csv("../..//python/group_A/results/covert_sweep_per_beta_100_reps.csv")
+sweep_covert$prop_covert <- round(sweep_covert$prop_covert, 2)
+```
+
+Plot the share of minorities across different values of top k, and across
+several ally scenarios:
+```{r warning = F, message=F, fig.width=14, fig.height=4}
+
+# extract every third value from our 20 values of ally shares
+ally_scenarios <- unique(sweep_allies$prop_ally)[seq(1, length(unique(sweep_allies$prop_ally)), 3)]
+
+
+# plot
+(plot_k_allies <- sweep_allies %>%
+    filter(., prop_ally %in% ally_scenarios)%>%
+    dplyr::group_by(beta, prop_ally)%>%
+    dplyr::summarise(prop_min_top_k = mean(prop_min_top_k),
+                     prop_ally_top_k = mean(prop_ally_top_k))%>%
+    pivot_longer(
+    cols = prop_min_top_k:prop_ally_top_k,
+    names_to = "proportion",
+    values_to = "prop")%>%
+    ggplot(., aes(x=beta, y=prop)) +
+    geom_line(aes(color = proportion))+
+    geom_hline(yintercept=0.20, linetype="dashed")+
+    facet_wrap(~ prop_ally, ncol = 7)+
+    labs(
+      title = "Effect of the increase in % of allies on the % of minorities/allies in top k  - by varying k",
+      y = "% of minorities in top-k%",
+      x = "Top k% PageRank",
+      color = "Proportion of:") +
+    scale_color_hue(labels=c("prop_min_top_k" = "Proportion minorities", "prop_ally_top_k"="Proportion allies"))+
+    theme_bw())
+  
+```
+
+Do the same for the covert minorities:
+```{r warning = F, message=F, fig.width=14, fig.height=4}
+# extract every third value from our 20 values of ally shares
+covert_scenarios <- unique(sweep_covert$prop_covert)[seq(1, length(unique(sweep_covert$prop_covert)), 3)]
+
+
+# plot
+(plot_k_covert <- sweep_covert %>%
+    filter(., prop_covert %in% covert_scenarios)%>%
+    dplyr::group_by(beta, prop_covert)%>%
+    dplyr::summarise(prop_all_minorities_top_k = mean(prop_all_minorities_top_k) )%>%
+    ggplot(., aes(x=beta, y=prop_all_minorities_top_k))+
+    geom_line( color = "red")+
+    geom_hline(yintercept=0.20, linetype="dashed")+
+    facet_wrap(~ prop_covert, ncol = 7)+
+    labs(
+      title = "Effect of the increase in % of hidden minority on the % of all minorities in top k  - by varying k",
+      y = "% of minorities in top-k%",
+      x = "Top k% PageRank",
+         color = "Proportion of:") +
+    scale_color_hue(labels=c("prop_min_top_k" = "Proportion minorities", "prop_ally_top_k"="Proportion allies"))+
+    theme_bw())
+```
+
