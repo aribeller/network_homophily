@@ -27,6 +27,8 @@ Read in the files:
 sweep_allies <- read_csv("../..//python/group_A/results/ally_sweep_per_fm_top_k.csv")
 sweep_allies$prop_ally <- round(sweep_allies$prop_ally, 2)
 
+sweep_allies$prop_ally_min <- sweep_allies$prop_ally + sweep_allies$prop_min
+sweep_allies$ally_to_min <- sweep_allies$prop_ally / sweep_allies$prop_min
 
 sweep_covert <-  read_csv("../..//python/group_A/results/covert_sweep_per_fm_top_k.csv")
 sweep_covert$prop_covert <- round(sweep_covert$prop_covert, 2)
@@ -44,15 +46,15 @@ data_hline <- data.frame(prop_min = unique(sweep_allies$prop_min),  # Create dat
 
 # plot
 (plot_k_allies <- sweep_allies %>%
-    filter(., beta == 0.05 & prop_min < 0.4)%>%
-    dplyr::group_by(beta, prop_min, prop_ally)%>%
+    filter(., beta == 0.05)%>%
+    dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
     dplyr::summarise(prop_min_top_k = mean(prop_min_top_k),
                      prop_ally_top_k = mean(prop_ally_top_k))%>%
     pivot_longer(
     cols = prop_min_top_k:prop_ally_top_k,
     names_to = "proportion",
     values_to = "prop")%>%
-    ggplot(., aes(x=prop_ally, y=prop)) +
+    ggplot(., aes(x=prop_ally_min, y=prop)) +
     geom_line(aes(color = proportion))+
     facet_wrap(~ prop_min, ncol = 7, scales = "free_x")+
         geom_hline(data = data_hline,
@@ -68,6 +70,44 @@ data_hline <- data.frame(prop_min = unique(sweep_allies$prop_min),  # Create dat
   
 ```
 
+Propoortion allies to minorities
+
+```{r warning = F, message=F, fig.width=16, fig.height=3.5}
+
+data_hline <- data.frame(prop_min = unique(sweep_allies$prop_min),  # Create data for lines
+                         hline = unique(sweep_allies$prop_min))%>%
+  filter(., prop_min < 0.4)
+
+
+
+# plot
+(plot_k_allies_min <- sweep_allies %>%
+    filter(., beta == 0.05)%>%
+    dplyr::group_by(beta, ally_to_min, prop_min, prop_ally)%>%
+    dplyr::summarise(prop_min_top_k = mean(prop_min_top_k),
+                     prop_ally_top_k = mean(prop_ally_top_k))%>%
+    pivot_longer(
+    cols = prop_min_top_k:prop_ally_top_k,
+    names_to = "proportion",
+    values_to = "prop")%>%
+    ggplot(., aes(x=ally_to_min, y=prop)) +
+    geom_line(aes(color = proportion))+
+    facet_wrap(~ prop_min, ncol = 7, scales = "free_x")+
+        geom_hline(data = data_hline,
+             aes(yintercept = hline),
+             linetype="dashed")+
+    labs(
+      title = "Effect of the increase in num of allies per minority member in top k  - by varying minority proportion",
+      y = "% of minorities in top-k%",
+      x = "Proportion allies to minorities",
+      color = "Proportion of:") +
+    scale_color_hue(labels=c("prop_min_top_k" = "Minorities", "prop_ally_top_k"="Allies"))+
+    theme_bw())
+  
+plot_k_allies_min
+```
+
+
 With the diagonal:
 ```{r warning = F, message=F, fig.width=16, fig.height=3.5}
 sweep_allies <- filter(sweep_allies, prop_min <0.4)
@@ -75,16 +115,15 @@ sweep_allies <- filter(sweep_allies, prop_min <0.4)
 # plot
 (plot_k_allies_diag <- sweep_allies %>%
     filter(., beta == 0.05 & prop_min < 0.4)%>%
-    dplyr::group_by(beta, prop_min, prop_ally)%>%
+    dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
     dplyr::summarise(prop_min_top_k = mean(prop_min_top_k),
                      prop_ally_top_k = mean(prop_ally_top_k))%>%
     pivot_longer(
     cols = prop_min_top_k:prop_ally_top_k,
     names_to = "proportion",
     values_to = "prop")%>%
-    ggplot(., aes(x=prop_ally, y=prop)) +
+    ggplot(., aes(x=prop_ally_min, y=prop)) +
     geom_line(aes(color = proportion))+
-    geom_abline()+
     facet_wrap(~ prop_min, ncol = 7)+
         geom_hline(data = data_hline,
              aes(yintercept = hline),
@@ -150,4 +189,29 @@ With the diagonals:
     scale_color_hue(labels=c("prop_min_top_k" = "Proportion minorities", "prop_ally_top_k"="Proportion allies"))+
     theme_bw())
 ```
+
+Proportion of overt minorities:
+```{r warning = F, message=F, fig.width=12, fig.height=6}
+plot_k_covert_diag_overt <- sweep_covert %>%
+    filter(., beta == 0.05)%>%
+    dplyr::group_by(prop_min, prop_covert, prop_covert_rescaled, beta)%>%
+    dplyr::summarise(prop_overt_top_k = mean(prop_overt_top_k) )%>%
+    ggplot(., aes(x=prop_covert, y=prop_overt_top_k))+
+    geom_line( color = "red")+
+    geom_hline(data = data_hline,
+               aes(yintercept = hline),
+               linetype="dashed")+
+   geom_abline()+
+    facet_wrap(~ prop_min, ncol = 5)+
+    labs(
+      title = "Effect of the increase in % of hidden minority on the % of all minorities in top k  - by varying k",
+      y = "% of minorities in top-k%",
+      x = "Proportion incorporated minority",
+         color = "Proportion of:") +
+    scale_color_hue(labels=c("prop_min_top_k" = "Proportion minorities", "prop_ally_top_k"="Proportion allies"))+
+    theme_bw()
+    
+plot_k_covert_diag_overt
+```
+
 
