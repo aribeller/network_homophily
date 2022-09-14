@@ -19,6 +19,53 @@ EPSILON = 0.00001
 # Functions
 ################################################################
 
+def ER_homophily_allies(N, fm, fa, h_MM, h_mm, seed=None):
+    '''
+    Generates a directed Erdos-Renyi homophilic network with allies.
+    - param N: number of nodes
+    - param fm: fraction of minorities
+    - param fa: fraction of allies
+    - h_MM: homophily among majorities
+    - h_mm: homophily among minorities
+    - seed: randommness seed for reproducibility
+    '''
+
+    np.random.seed(seed)
+
+    h_Mm = 1 - h_MM
+    h_mM = 1 - h_mm
+
+    N_m = int(N * fm)
+    N_a = int(N * fa)
+    N_M = N - (N_m + N_a)
+
+    # Construct nine submatrices and combine them
+    #
+    # [ MM, Mm, Ma,
+    #   mM, mm, ma,
+    #   aM, am, aa]
+
+    MM = np.random.uniform(size=(N_M, N_M)) < h_MM
+    Mm = np.random.uniform(size=(N_M, N_m)) < h_Mm
+    Ma = np.random.uniform(size=(N_M, N_a)) < h_MM
+
+    mM = np.random.uniform(size=(N_m, N_M)) < h_mM
+    mm = np.random.uniform(size=(N_m, N_m)) < h_mm
+    ma = np.random.uniform(size=(N_m, N_a)) < h_mM
+
+    aM = np.random.uniform(size=(N_a, N_M)) < h_mM
+    am = np.random.uniform(size=(N_a, N_m)) < h_mm
+    aa = np.random.uniform(size=(N_a, N_a)) < h_mM
+
+    M = np.block([
+        [MM, Mm, Ma],
+        [mM, mm, ma],
+        [aM, am, aa]
+    ])
+
+    return M.T
+
+
 def DPAH2(N, fm, fa, d, plo_M, plo_m, h_MM, h_mm, verbose=False, seed=None):
     '''
     Generates a Directed Barabasi-Albert Homophilic network.
