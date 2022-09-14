@@ -165,6 +165,10 @@ def _pick_target(source, N, labels, indegrees, outdegrees, homophily):
     probs = np.array([ homophily[labels[source],labels[n]] * (indegrees[n]+1) for n in targets])
 
     probs /= probs.sum()
+    
+    if sum(1 for i in probs if i < 0)>0:
+        print('This is a negative probability')
+        print(probs)
     return np.random.choice(a=targets,size=1,replace=True,p=probs)[0]
 
 ################################################################
