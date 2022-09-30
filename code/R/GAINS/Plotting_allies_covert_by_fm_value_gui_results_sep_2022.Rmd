@@ -1,0 +1,174 @@
+---
+title: "R Notebook"
+---
+
+Analyzing the top different top 5 percentages in the original setup with
+homophily of majorities and minorities of 0.8 towards ingroup and 0.2 towards the 
+outgroup. We introduce either a share of majority as allies (majority members
+who are treated as the majority by others, but prefer the minority group at the
+expense of the majority group); or "invisible" minorities (minority members who
+are treated as the majority by the majority and minority groups, but they
+act as minority groups themselves).
+
+
+Three scenarios!
+
+
+First, load some packages:
+```{r message = F, warning = F}
+library(readr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+
+```
+
+
+## Scenario 1 - as before
+
+Read in the files:
+```{r message = F, warning = F}
+sweep_allies <- read_csv("E:/Projects/Homophily/gui_results/results/extracted_ally_sweep_per_fm_top_k_new.csv")
+sweep_allies$prop_ally <- round(sweep_allies$prop_ally, 2)
+
+sweep_allies$prop_ally_min <- sweep_allies$prop_ally + sweep_allies$prop_min
+sweep_allies$ally_to_min <- sweep_allies$prop_ally / sweep_allies$prop_min
+```
+
+Group into groups:
+```{r}
+groupings <- findInterval(sort(unique(sweep_allies$prop_min)), seq(0.010, 0.515, 0.015))
+
+groupings_key_1 <- data.frame(group_no = sort(unique(groupings)),
+                              group_value = seq(0.010, 0.515, 0.015)[-c(29, 32, 34)])
+
+groupings_key_2 <- data.frame(prop_min = sort(unique(sweep_allies$prop_min)),
+                              group_no = groupings)
+
+groupings_key_3 <- merge(groupings_key_1,
+                         groupings_key_2,
+                         by = "group_no")
+
+
+
+sweep_allies_merge <- merge(sweep_allies,
+                            groupings_key_3,
+                            by = "prop_min")
+
+# average across minority shares and iterations
+sweep_allies_grouped <- sweep_allies_merge %>%
+  filter(beta == 0.05)%>%
+  group_by(group_value, prop_ally)%>%
+  summarise(across(everything(), list(mean)))
+
+colnames(sweep_allies_grouped) <- stringr::str_remove(colnames(sweep_allies_grouped), "_1")
+
+sweep_allies_grouped$group_value <- round(sweep_allies_grouped$group_value, 2)
+```
+
+
+Plot the share of minorities across different minority share setups, with
+the share of minority in top 5% of the nodes:
+```{r warning = F, message=F, fig.width=16, fig.height=3.5}
+
+# data for vertical lines - find proportion of allies for which minorities reach parity
+vertical_lines <- sweep_allies_grouped %>%
+  filter(beta == 0.05)%>%
+  dplyr::group_by(beta, prop_ally_min, group_value, prop_ally)%>%
+  summarise(prop_min_avg = round(mean(group_value), 2),
+            prop_ally_avg = round(mean(prop_ally), 2),
+            prop_min_top_k_avg = round(mean(prop_min_top_k), 2))%>%
+  as.data.frame()
+  
+vertical_lines <- vertical_lines[, 5:7]
+
+vertical_lines <- vertical_lines %>%
+  group_by(prop_min_avg)%>%
+  filter(prop_min_top_k_avg >= (prop_min_avg))%>%
+  slice(which.min(prop_ally_avg))
+  
+data_lines <- data.frame(prop_min = vertical_lines$prop_min_avg,  # Create data for lines
+                         hline = vertical_lines$prop_min_avg,
+                         vline = vertical_lines$prop_ally_avg)%>%
+  filter(., prop_min < 0.5)
+
+# plot
+plot_k_allies <- sweep_allies_grouped %>%
+    filter(., beta == 0.05)%>%
+    dplyr::group_by(beta, prop_ally_min, group_value, prop_ally)%>%
+    dplyr::summarise(prop_min_top_k = mean(prop_min_top_k))%>%
+    pivot_longer(
+    cols = prop_min_top_k,
+    names_to = "proportion",
+    values_to = "prop")%>%
+    ggplot(., aes(x=prop_ally, y=prop)) +
+    geom_line(aes(color = proportion))+
+    facet_wrap(~ group_value, ncol = 7)+
+    geom_hline(data = data_lines,
+               aes(yintercept = hline),
+               linetype="dashed")+
+    geom_vline(data = data_lines,
+               aes(xintercept = vline),
+               linetype="dashed")+
+    labs(
+      title = "Effect of the increase in % of allies on the % of minorities/allies in top k  - by varying minority proportion",
+      y = "% of minorities in top-k%",
+      x = "Proportion allies",
+      color = "Proportion of:") +
+    theme_bw()
+
+```
+
+Proportion allies to minorities, a few interesting examples:
+```{r warning = F, message=F, fig.width=10, fig.height=3.5}
+
+interesting_cases <- c(0.10, 0.20,  0.28)
+
+
+sweep_allies_interesting <- filter(sweep_allies_grouped, 
+                                   round(group_value,3) %in% interesting_cases)
+
+
+sweep_allies_interesting$prop_min <- paste0(paste0("Minority ", sweep_allies_interesting$group_value*100), "%")
+
+data_lines_interesting <- filter(data_lines, prop_min %in% interesting_cases)
+data_lines_interesting$prop_min <- paste0(paste0("Minority ", data_lines_interesting$prop_min*100), "%")
+
+# plot
+(plot_k_allies_interesting <- sweep_allies_interesting %>%
+    filter(.,  beta == 0.05)%>%
+    dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
+    dplyr::summarise(prop_min_top_k = mean(prop_min_top_k))%>%
+    pivot_longer(
+    cols = prop_min_top_k,
+    names_to = "proportion",
+    values_to = "prop")%>%
+    ggplot(., aes(x=prop_ally, y=prop)) +
+    geom_point(aes(color = proportion), size = 1.2)+
+    geom_line(aes(color = proportion))+
+    facet_wrap(~ as.factor(prop_min))+
+    geom_hline(data = data_lines_interesting,
+             aes(yintercept = hline),
+             linetype="dashed")+
+    geom_vline(data = data_lines_interesting,
+               aes(xintercept = vline),
+               linetype="dashed")+
+    geom_text(data = data_lines_interesting, aes(x = vline, label = paste0(vline*100, '% for equity'), y = Inf),
+            hjust = -0.1, vjust = 1.5) +
+    labs(
+      title = "Effect of the increase in the % of allies per minority member in top 5% of the nodes ",
+      y = "% in top 5% of the nodes",
+      x = "Proportion allies",
+      x.axis.text=element_text(size=12),
+      y.axis.title=element_text(size=14,face="bold")
+      ) +
+    theme_bw()+
+    theme(legend.position = "none",
+          strip.text.x = element_text(size = 13),
+          axis.text.x = element_text(size = 10),
+          axis.text.y = element_text(size = 10),
+          axis.title.x = element_text(size = 12),
+          axis.title.y = element_text(size = 12)))
+    
+```
+
