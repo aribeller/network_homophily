@@ -58,7 +58,7 @@ sweep_allies_merge <- merge(sweep_allies,
 # average across minority shares and iterations
 sweep_allies_grouped <- sweep_allies_merge %>%
   filter(beta == 0.05)%>%
-  group_by(group_value, prop_ally)%>%
+  group_by(group_value, prop_ally, iter)%>%
   summarise(across(everything(), list(mean)))
 
 colnames(sweep_allies_grouped) <- stringr::str_remove(colnames(sweep_allies_grouped), "_1")
@@ -97,12 +97,8 @@ plot_k_allies <- sweep_allies_grouped %>%
     filter(., beta == 0.05)%>%
     dplyr::group_by(beta, prop_ally_min, group_value, prop_ally)%>%
     dplyr::summarise(prop_min_top_k = mean(prop_min_top_k))%>%
-    pivot_longer(
-    cols = prop_min_top_k,
-    names_to = "proportion",
-    values_to = "prop")%>%
-    ggplot(., aes(x=prop_ally, y=prop)) +
-    geom_line(aes(color = proportion))+
+    ggplot(., aes(x=prop_ally, y=prop_min_top_k)) +
+    geom_line(aes(color = prop_min_top_k))+
     facet_wrap(~ group_value, ncol = 7)+
     geom_hline(data = data_lines,
                aes(yintercept = hline),
@@ -138,14 +134,17 @@ data_lines_interesting$prop_min <- paste0(paste0("Minority ", data_lines_interes
 (plot_k_allies_interesting <- sweep_allies_interesting %>%
     filter(.,  beta == 0.05)%>%
     dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
-    dplyr::summarise(prop_min_top_k = mean(prop_min_top_k))%>%
-    pivot_longer(
-    cols = prop_min_top_k,
-    names_to = "proportion",
-    values_to = "prop")%>%
-    ggplot(., aes(x=prop_ally, y=prop)) +
-    geom_point(aes(color = proportion), size = 1.2)+
-    geom_line(aes(color = proportion))+
+    dplyr::summarise(mean_prop_min_top_k = mean(prop_min_top_k),
+                     sd_prop_min = sd(prop_min_top_k),
+                     n_prop_min = n())%>%
+    dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min
+             )%>%
+    ggplot(., aes(x=prop_ally, y=mean_prop_min_top_k)) +
+    geom_point(aes(color = mean_prop_min_top_k), size = 1.2, color = "red")+
+    geom_line(aes(color = mean_prop_min_top_k), color = "red", size = 0.5)+
+    geom_linerange(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
     facet_wrap(~ as.factor(prop_min))+
     geom_hline(data = data_lines_interesting,
              aes(yintercept = hline),
@@ -170,5 +169,14 @@ data_lines_interesting$prop_min <- paste0(paste0("Minority ", data_lines_interes
           axis.title.x = element_text(size = 12),
           axis.title.y = element_text(size = 12)))
     
+```
+
+```{r}
+# png(filename = "Plots/large_n_allies.png",
+#     width = 10, height = 3.5, units = "in", res = 600) 
+# 
+# plot_k_allies_interesting
+# 
+# dev.off()
 ```
 

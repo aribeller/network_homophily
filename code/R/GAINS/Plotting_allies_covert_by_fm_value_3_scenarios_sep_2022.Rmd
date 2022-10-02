@@ -43,7 +43,7 @@ the share of minority in top 5% of the nodes:
 ```{r warning = F, message=F, fig.width=16, fig.height=3.5}
 
 # data for vertical lines - find proportion of allies for which minorities reach equity
-vertical_lines_1_1 <- sweep_allies_1 %>%
+vertical_lines_1 <- sweep_allies_1 %>%
   filter(beta == 0.05)%>%
   dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
   summarise(prop_min_avg = round(mean(prop_min), 2),
@@ -55,7 +55,7 @@ vertical_lines_1 <- vertical_lines_1[, 5:7]
 
 vertical_lines_1 <- vertical_lines_1 %>%
   group_by(prop_min_avg)%>%
-  filter(prop_min_top_k_avg >= (prop_min_avg - 0.01))%>%
+  filter(prop_min_top_k_avg >= prop_min_avg)%>%
   slice(which.min(prop_ally_avg))
   
 data_lines_1 <- data.frame(prop_min = unique(sweep_allies_1$prop_min),  # Create data for lines
@@ -67,13 +67,16 @@ data_lines_1 <- data.frame(prop_min = unique(sweep_allies_1$prop_min),  # Create
 (plot_k_allies_1 <- sweep_allies_1 %>%
     filter(., beta == 0.05)%>%
     dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
-    dplyr::summarise(prop_min_top_k = mean(prop_min_top_k))%>%
-    pivot_longer(
-    cols = prop_min_top_k,
-    names_to = "proportion",
-    values_to = "prop")%>%
-    ggplot(., aes(x=prop_ally, y=prop)) +
-    geom_line(aes(color = proportion))+
+    dplyr::summarise(mean_prop_min_top_k = mean(prop_min_top_k),
+                     sd_prop_min = sd(prop_min_top_k),
+                     n_prop_min = n())%>%
+    dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min
+             )%>%
+    ggplot(., aes(x=prop_ally, y=mean_prop_min_top_k),  size = 1.2, color = "red") +
+    geom_line(aes(color = mean_prop_min_top_k), color = "red", size = 0.5)+
+    geom_linerange(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
     facet_wrap(~ prop_min, ncol = 7)+
     geom_hline(data = data_lines_1,
                aes(yintercept = hline),
@@ -86,9 +89,14 @@ data_lines_1 <- data.frame(prop_min = unique(sweep_allies_1$prop_min),  # Create
     labs(
       title = "Effect of the increase in % of allies on the % of minorities/allies in top k  - by varying minority proportion",
       y = "% of minorities in top-k%",
-      x = "Proportion allies",
-      color = "Proportion of:") +
-    theme_bw())
+      x = "Proportion allies") +
+    theme_bw()+
+    theme(legend.position = "none",
+          strip.text.x = element_text(size = 13),
+          axis.text.x = element_text(size = 10),
+          axis.text.y = element_text(size = 10),
+          axis.title.x = element_text(size = 12),
+          axis.title.y = element_text(size = 12)))
   
 ```
 
@@ -110,13 +118,16 @@ data_lines_1_interesting$prop_min <- paste0(paste0("Minority ", data_lines_1_int
 (plot_k_allies_1_interesting <- sweep_allies_1_interesting %>%
     filter(.,  beta == 0.05)%>%
     dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
-    dplyr::summarise(prop_min_top_k = mean(prop_min_top_k))%>%
-    pivot_longer(
-    cols = prop_min_top_k,
-    names_to = "proportion",
-    values_to = "prop")%>%
-    ggplot(., aes(x=prop_ally, y=prop)) +
-    geom_line(aes(color = proportion), size = 1.2)+
+    dplyr::summarise(mean_prop_min_top_k = mean(prop_min_top_k),
+                     sd_prop_min = sd(prop_min_top_k),
+                     n_prop_min = n())%>%
+    dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min
+             )%>%
+    ggplot(., aes(x=prop_ally, y=mean_prop_min_top_k),  size = 1.2, color = "red") +
+    geom_line(aes(color = mean_prop_min_top_k), color = "red", size = 0.5)+
+    geom_linerange(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
     facet_wrap(~ as.factor(prop_min))+
     geom_hline(data = data_lines_1_interesting,
              aes(yintercept = hline),
@@ -160,7 +171,7 @@ vertical_lines_1 <- vertical_lines_1[, 4:6]
 
 vertical_lines_1 <- vertical_lines_1 %>%
   group_by(prop_min_avg)%>%
-  filter(prop_min_top_k_avg >= (prop_min_avg-0.01))%>%
+  filter(prop_min_top_k_avg >= prop_min_avg)%>%
   slice(which.min(prop_covert_avg))
   
 data_lines_1 <- data.frame(prop_min = unique(sweep_covert_1$prop_min),  # Create data for lines
@@ -172,9 +183,16 @@ data_lines_1 <- data.frame(prop_min = unique(sweep_covert_1$prop_min),  # Create
 (plot_k_covert_1 <- sweep_covert_1 %>%
     filter(., beta == 0.05)%>%
     dplyr::group_by(prop_min, prop_covert, beta)%>%
-    dplyr::summarise(prop_all_minorities_top_k = mean(prop_all_minorities_top_k) )%>%
-    ggplot(., aes(x=prop_covert, y=prop_all_minorities_top_k))+
-    geom_line( color = "red")+
+    dplyr::summarise(mean_prop_min_top_k = mean(prop_all_minorities_top_k),
+                     sd_prop_min = sd(prop_all_minorities_top_k),
+                     n_prop_min = n())%>%
+    dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min
+             )%>%
+    ggplot(., aes(x=prop_covert, y=mean_prop_min_top_k),  size = 1.2, color = "red") +
+    geom_line(aes(color = mean_prop_min_top_k), color = "red", size = 0.5)+
+    geom_linerange(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
     geom_hline(data = data_lines_1,
                aes(yintercept = hline),
                linetype="dashed")+
@@ -214,9 +232,16 @@ data_lines_1_interesting$prop_min <- paste0(paste0("Minority ", data_lines_1_int
 (plot_k_covert_1_diag_interesting <- sweep_covert_1_interesting %>%
     filter(., beta == 0.05)%>%
     dplyr::group_by(prop_min, prop_covert, prop_covert_rescaled, beta)%>%
-    dplyr::summarise(prop_all_minorities_top_k = mean(prop_all_minorities_top_k))%>%
-    ggplot(., aes(x=prop_covert, y=prop_all_minorities_top_k))+
-    geom_line( color = "red", size = 1)+
+    dplyr::summarise(mean_prop_min_top_k = mean(prop_all_minorities_top_k),
+                     sd_prop_min = sd(prop_all_minorities_top_k),
+                     n_prop_min = n())%>%
+    dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min
+             )%>%
+    ggplot(., aes(x=prop_covert, y=mean_prop_min_top_k),  size = 1.2, color = "red") +
+    geom_line(aes(color = mean_prop_min_top_k), color = "red", size = 0.5)+
+    geom_linerange(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
     geom_hline(data = data_lines_1_interesting,
                aes(yintercept = hline),
                linetype="dashed")+
@@ -284,13 +309,16 @@ data_lines_2 <- data.frame(prop_min = unique(sweep_allies_2$prop_min),  # Create
 (plot_k_allies_2 <- sweep_allies_2 %>%
     filter(., beta == 0.05)%>%
     dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
-    dplyr::summarise(prop_min_top_k = mean(prop_min_top_k))%>%
-    pivot_longer(
-    cols = prop_min_top_k,
-    names_to = "proportion",
-    values_to = "prop")%>%
-    ggplot(., aes(x=prop_ally, y=prop)) +
-    geom_line(aes(color = proportion))+
+    dplyr::summarise(mean_prop_min_top_k = mean(prop_min_top_k),
+                     sd_prop_min = sd(prop_min_top_k),
+                     n_prop_min = n())%>%
+    dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min
+             )%>%
+    ggplot(., aes(x=prop_ally, y=mean_prop_min_top_k),  size = 1.2, color = "red") +
+    geom_line(aes(color = mean_prop_min_top_k), color = "red", size = 0.5)+
+    geom_linerange(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
     facet_wrap(~ prop_min, ncol = 7)+
     geom_hline(data = data_lines_2,
                aes(yintercept = hline),
@@ -327,13 +355,16 @@ data_lines_2_interesting$prop_min <- paste0(paste0("Minority ", data_lines_2_int
 (plot_k_allies_2_interesting <- sweep_allies_2_interesting %>%
     filter(.,  beta == 0.05)%>%
     dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
-    dplyr::summarise(prop_min_top_k = mean(prop_min_top_k))%>%
-    pivot_longer(
-    cols = prop_min_top_k,
-    names_to = "proportion",
-    values_to = "prop")%>%
-    ggplot(., aes(x=prop_ally, y=prop)) +
-    geom_line(aes(color = proportion), size = 1.2)+
+    dplyr::summarise(mean_prop_min_top_k = mean(prop_min_top_k),
+                     sd_prop_min = sd(prop_min_top_k),
+                     n_prop_min = n())%>%
+    dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min
+             )%>%
+    ggplot(., aes(x=prop_ally, y=mean_prop_min_top_k),  size = 1.2, color = "red") +
+    geom_line(aes(color = mean_prop_min_top_k), color = "red", size = 0.5)+
+    geom_linerange(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
     facet_wrap(~ as.factor(prop_min))+
     geom_hline(data = data_lines_2_interesting,
              aes(yintercept = hline),
@@ -390,9 +421,17 @@ data_lines_2 <- data.frame(prop_min = unique(sweep_covert_2$prop_min),  # Create
 (plot_k_covert_2 <- sweep_covert_2 %>%
     filter(., beta == 0.05)%>%
     dplyr::group_by(prop_min, prop_covert, beta)%>%
-    dplyr::summarise(prop_all_minorities_top_k = mean(prop_all_minorities_top_k) )%>%
-    ggplot(., aes(x=prop_covert, y=prop_all_minorities_top_k))+
-    geom_line( color = "red")+
+    dplyr::summarise(mean_prop_min_top_k = mean(prop_all_minorities_top_k),
+                     sd_prop_min = sd(prop_all_minorities_top_k),
+                     n_prop_min = n())%>%
+    dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min
+             )%>%
+    ggplot(., aes(x=prop_covert, y=mean_prop_min_top_k),  size = 1.2, color = "red") +
+    geom_line(aes(color = mean_prop_min_top_k), color = "red", size = 0.5)+
+    geom_linerange(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
+    facet_wrap(~ as.factor(prop_min))+
     geom_hline(data = data_lines_2,
                aes(yintercept = hline),
                linetype="dashed")+
@@ -430,9 +469,16 @@ data_lines_2_interesting$prop_min <- paste0(paste0("Minority ", data_lines_2_int
 (plot_k_covert_2_diag_interesting <- sweep_covert_2_interesting %>%
     filter(., beta == 0.05)%>%
     dplyr::group_by(prop_min, prop_covert, prop_covert_rescaled, beta)%>%
-    dplyr::summarise(prop_all_minorities_top_k = mean(prop_all_minorities_top_k))%>%
-    ggplot(., aes(x=prop_covert, y=prop_all_minorities_top_k))+
-    geom_line( color = "red", size = 1)+
+    dplyr::summarise(mean_prop_min_top_k = mean(prop_all_minorities_top_k),
+                     sd_prop_min = sd(prop_all_minorities_top_k),
+                     n_prop_min = n())%>%
+    dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min
+             )%>%
+    ggplot(., aes(x=prop_covert, y=mean_prop_min_top_k),  size = 1.2, color = "red") +
+    geom_line(aes(color = mean_prop_min_top_k), color = "red", size = 0.5)+
+    geom_linerange(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
     geom_hline(data = data_lines_2_interesting,
                aes(yintercept = hline),
                linetype="dashed")+
@@ -494,13 +540,16 @@ data_lines_3 <- data.frame(prop_min = unique(sweep_allies_3$prop_min),  # Create
 (plot_k_allies_3 <- sweep_allies_3 %>%
     filter(., beta == 0.05)%>%
     dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
-    dplyr::summarise(prop_min_top_k = mean(prop_min_top_k))%>%
-    pivot_longer(
-    cols = prop_min_top_k,
-    names_to = "proportion",
-    values_to = "prop")%>%
-    ggplot(., aes(x=prop_ally, y=prop)) +
-    geom_line(aes(color = proportion))+
+    dplyr::summarise(mean_prop_min_top_k = mean(prop_min_top_k),
+                     sd_prop_min = sd(prop_min_top_k),
+                     n_prop_min = n())%>%
+    dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min
+             )%>%
+    ggplot(., aes(x=prop_ally, y=mean_prop_min_top_k),  size = 1.2, color = "red") +
+    geom_line(aes(color = mean_prop_min_top_k), color = "red", size = 0.5)+
+    geom_linerange(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
     facet_wrap(~ prop_min, ncol = 7)+
     geom_hline(data = data_lines_3,
                aes(yintercept = hline),
@@ -524,7 +573,7 @@ Proportion allies to minorities, a few interesting examples:
 interesting_cases <- c(0.1, 0.2, 0.3)
 
 
-sweep_allies_interesting <- filter(sweep_allies, 
+sweep_allies_interesting <- filter(sweep_allies_3, 
                                    prop_min %in% interesting_cases)
 
 
@@ -537,13 +586,16 @@ data_lines_interesting$prop_min <- paste0(paste0("Minority ", data_lines_interes
 (plot_k_allies_interesting <- sweep_allies_interesting %>%
     filter(.,  beta == 0.05)%>%
     dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
-    dplyr::summarise(prop_min_top_k = mean(prop_min_top_k))%>%
-    pivot_longer(
-    cols = prop_min_top_k,
-    names_to = "proportion",
-    values_to = "prop")%>%
-    ggplot(., aes(x=prop_ally, y=prop)) +
-    geom_line(aes(color = proportion), size = 1.2)+
+    dplyr::summarise(mean_prop_min_top_k = mean(prop_min_top_k),
+                     sd_prop_min = sd(prop_min_top_k),
+                     n_prop_min = n())%>%
+    dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min
+             )%>%
+    ggplot(., aes(x=prop_ally, y=mean_prop_min_top_k),  size = 1.2, color = "red") +
+    geom_line(aes(color = mean_prop_min_top_k), color = "red", size = 0.5)+
+    geom_linerange(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
     facet_wrap(~ as.factor(prop_min))+
     geom_hline(data = data_lines_interesting,
              aes(yintercept = hline),
@@ -574,8 +626,8 @@ data_lines_interesting$prop_min <- paste0(paste0("Minority ", data_lines_interes
 
 Do the same for the covert minorities:
 ```{r warning = F, message=F, fig.width=12, fig.height=6}
-data_hline <- data.frame(prop_min = unique(sweep_covert$prop_min),  # Create data for lines
-                         hline = unique(sweep_covert$prop_min))
+data_hline <- data.frame(prop_min = unique(sweep_covert_3$prop_min),  # Create data for lines
+                         hline = unique(sweep_covert_3$prop_min))
 
 # data for vertical lines - find proportion of allies for which minorities reach equity
 vertical_lines <- sweep_covert_3 %>%
@@ -593,8 +645,8 @@ vertical_lines <- vertical_lines %>%
   filter(prop_min_top_k_avg >= (prop_min_avg-0.01))%>%
   slice(which.min(prop_covert_avg))
   
-data_lines_3 <- data.frame(prop_min = unique(sweep_covert$prop_min),  # Create data for lines
-                         hline = unique(sweep_covert$prop_min),
+data_lines_3 <- data.frame(prop_min = unique(sweep_covert_3$prop_min),  # Create data for lines
+                         hline = unique(sweep_covert_3$prop_min),
                          vline = vertical_lines$prop_covert_avg)%>%
   filter(., prop_min < 0.5)
 
@@ -602,9 +654,16 @@ data_lines_3 <- data.frame(prop_min = unique(sweep_covert$prop_min),  # Create d
 (plot_k_covert_3 <- sweep_covert_3 %>%
     filter(., beta == 0.05)%>%
     dplyr::group_by(prop_min, prop_covert, beta)%>%
-    dplyr::summarise(prop_all_minorities_top_k = mean(prop_all_minorities_top_k) )%>%
-    ggplot(., aes(x=prop_covert, y=prop_all_minorities_top_k))+
-    geom_line( color = "red")+
+    dplyr::summarise(mean_prop_min_top_k = mean(prop_all_minorities_top_k),
+                     sd_prop_min = sd(prop_all_minorities_top_k),
+                     n_prop_min = n())%>%
+    dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min
+             )%>%
+    ggplot(., aes(x=prop_covert, y=mean_prop_min_top_k),  size = 1.2, color = "red") +
+    geom_line(aes(color = mean_prop_min_top_k), color = "red", size = 0.5)+
+    geom_linerange(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
     geom_hline(data = data_lines_3,
                aes(yintercept = hline),
                linetype="dashed")+
@@ -628,12 +687,12 @@ Plot some interesting cases:
 interesting_cases <- c(0.1, 0.2, 0.3, 0.4)
 
 
-sweep_covert_interesting <- filter(sweep_covert, 
+sweep_covert_interesting <- filter(sweep_covert_3, 
                                    prop_min %in% interesting_cases)
 
 sweep_covert_interesting$prop_min <- paste0(paste0("Minority ", sweep_covert_interesting$prop_min*100), "%")
 
-data_lines_interesting <- filter(data_lines,
+data_lines_interesting <- filter(data_lines_3,
                                  prop_min %in% interesting_cases)
 
 data_lines_interesting$prop_min <- paste0(paste0("Minority ", data_lines_interesting$prop_min*100), "%")
@@ -642,9 +701,16 @@ data_lines_interesting$prop_min <- paste0(paste0("Minority ", data_lines_interes
 (plot_k_covert_diag_interesting <- sweep_covert_interesting %>%
     filter(., beta == 0.05)%>%
     dplyr::group_by(prop_min, prop_covert, prop_covert_rescaled, beta)%>%
-    dplyr::summarise(prop_all_minorities_top_k = mean(prop_all_minorities_top_k))%>%
-    ggplot(., aes(x=prop_covert, y=prop_all_minorities_top_k))+
-    geom_line( color = "red", size = 1)+
+    dplyr::summarise(mean_prop_min_top_k = mean(prop_all_minorities_top_k),
+                     sd_prop_min = sd(prop_all_minorities_top_k),
+                     n_prop_min = n())%>%
+    dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min
+             )%>%
+    ggplot(., aes(x=prop_covert, y=mean_prop_min_top_k),  size = 1.2, color = "red") +
+    geom_line(aes(color = mean_prop_min_top_k), color = "red", size = 0.5)+
+    geom_linerange(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
     geom_hline(data = data_lines_interesting,
                aes(yintercept = hline),
                linetype="dashed")+
@@ -671,22 +737,25 @@ interesting_cases <- c(0.1, 0.2, 0.3)
 ally_sweep_1 <- sweep_allies_1 %>%
   filter(., beta == 0.05 & prop_min %in% interesting_cases)%>%
   dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
-  dplyr::summarise(prop_min_top_k = mean(prop_min_top_k))%>%
-  pivot_longer(
-  cols = prop_min_top_k,
-  names_to = "proportion",
-  values_to = "prop")
+  dplyr::summarise(mean_prop_min_top_k = mean(prop_min_top_k),
+                     sd_prop_min = sd(prop_min_top_k),
+                     n_prop_min = n())%>%
+  dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min)
+             
 
 ally_sweep_1$scenario <- "Scenario 1"
 
 ally_sweep_2 <- sweep_allies_2 %>%
   filter(., beta == 0.05 & prop_min %in% interesting_cases)%>%
   dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
-  dplyr::summarise(prop_min_top_k = mean(prop_min_top_k))%>%
-  pivot_longer(
-  cols = prop_min_top_k,
-  names_to = "proportion",
-  values_to = "prop")
+  dplyr::summarise(mean_prop_min_top_k = mean(prop_min_top_k),
+                     sd_prop_min = sd(prop_min_top_k),
+                     n_prop_min = n())%>%
+  dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min)
 
 ally_sweep_2$scenario <- "Scenario 2"
 
@@ -694,11 +763,12 @@ ally_sweep_2$scenario <- "Scenario 2"
 ally_sweep_3 <- sweep_allies_3 %>%
   filter(., beta == 0.05 & prop_min %in% interesting_cases)%>%
   dplyr::group_by(beta, prop_ally_min, prop_min, prop_ally)%>%
-  dplyr::summarise(prop_min_top_k = mean(prop_min_top_k))%>%
-  pivot_longer(
-  cols = prop_min_top_k,
-  names_to = "proportion",
-  values_to = "prop")
+  dplyr::summarise(mean_prop_min_top_k = mean(prop_min_top_k),
+                     sd_prop_min = sd(prop_min_top_k),
+                     n_prop_min = n())%>%
+  dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min)
 
 ally_sweep_3$scenario <- "Scenario 3"
 
@@ -720,8 +790,9 @@ Plot the scenario comparison:
 
 # plot
 (plot_scenarios <- combined_ally_scenarios %>%
-    ggplot(., aes(x=prop_ally, y=prop)) +
+    ggplot(., aes(x=prop_ally, y=mean_prop_min_top_k)) +
     geom_line(aes(color = scenario), size = 1.2)+
+    #geom_errorbar(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
     facet_wrap(~ as.factor(prop_min))+
     geom_hline(data = data_lines_combined,
              aes(yintercept = hline),
@@ -743,6 +814,64 @@ Plot the scenario comparison:
     
 ```
 
+```{r}
+png(filename = "Plots/small_n_allies_3_scenarios_ci.png",
+    width = 10, height = 5, units = "in", res = 600)
+
+combined_ally_scenarios %>%
+    ggplot(., aes(x=prop_ally, y=mean_prop_min_top_k)) +
+    geom_line(aes(color = scenario), size = 1.2)+
+    geom_errorbar(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
+    facet_wrap(~ as.factor(prop_min))+
+    geom_hline(data = data_lines_combined,
+             aes(yintercept = hline),
+             linetype="dashed")+
+    labs(
+      title = "Effect of the increase in the % of allies per minority member in top 5% of the nodes ",
+      y = "% in top 5% of the nodes",
+      x = "Proportion allies",
+      x.axis.text=element_text(size=12),
+      y.axis.title=element_text(size=14,face="bold")
+      ) +
+    theme_bw()+
+    theme(
+          strip.text.x = element_text(size = 13),
+          axis.text.x = element_text(size = 10),
+          axis.text.y = element_text(size = 10),
+          axis.title.x = element_text(size = 12),
+          axis.title.y = element_text(size = 12))
+
+dev.off()
+
+
+png(filename = "Plots/small_n_allies_3_scenarios.png",
+    width = 10, height = 5, units = "in", res = 600)
+
+combined_ally_scenarios %>%
+    ggplot(., aes(x=prop_ally, y=mean_prop_min_top_k)) +
+    geom_line(aes(color = scenario), size = 1.2)+
+    #geom_errorbar(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
+    facet_wrap(~ as.factor(prop_min))+
+    geom_hline(data = data_lines_combined,
+             aes(yintercept = hline),
+             linetype="dashed")+
+    labs(
+      title = "Effect of the increase in the % of allies per minority member in top 5% of the nodes ",
+      y = "% in top 5% of the nodes",
+      x = "Proportion allies",
+      x.axis.text=element_text(size=12),
+      y.axis.title=element_text(size=14,face="bold")
+      ) +
+    theme_bw()+
+    theme(
+          strip.text.x = element_text(size = 13),
+          axis.text.x = element_text(size = 10),
+          axis.text.y = element_text(size = 10),
+          axis.title.x = element_text(size = 12),
+          axis.title.y = element_text(size = 12))
+
+dev.off()
+```
 
 
 
@@ -755,14 +884,24 @@ interesting_cases <- c(0.1, 0.2, 0.3, 0.4)
 covert_sweep_1 <- sweep_covert_1 %>%
   filter(., beta == 0.05 & prop_min %in% interesting_cases)%>%
   dplyr::group_by(beta, prop_covert, prop_min)%>%
-    dplyr::summarise(prop_all_minorities_top_k = mean(prop_all_minorities_top_k))
+  dplyr::summarise(mean_prop_min_top_k = mean(prop_all_minorities_top_k),
+                     sd_prop_min = sd(prop_all_minorities_top_k),
+                     n_prop_min = n())%>%
+  dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min)
 
 covert_sweep_1$scenario <- "Scenario 1"
 
 covert_sweep_2 <- sweep_covert_2 %>%
   filter(., beta == 0.05 & prop_min %in% interesting_cases)%>%
   dplyr::group_by(beta, prop_covert, prop_min)%>%
-    dplyr::summarise(prop_all_minorities_top_k = mean(prop_all_minorities_top_k))
+  dplyr::summarise(mean_prop_min_top_k = mean(prop_all_minorities_top_k),
+                     sd_prop_min = sd(prop_all_minorities_top_k),
+                     n_prop_min = n())%>%
+  dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min)
                      
 
 covert_sweep_2$scenario <- "Scenario 2"
@@ -771,7 +910,12 @@ covert_sweep_2$scenario <- "Scenario 2"
 covert_sweep_3 <- sweep_covert_3 %>%
   filter(., beta == 0.05 & prop_min %in% interesting_cases)%>%
   dplyr::group_by(beta, prop_covert, prop_min)%>%
-    dplyr::summarise(prop_all_minorities_top_k = mean(prop_all_minorities_top_k))
+  dplyr::summarise(mean_prop_min_top_k = mean(prop_all_minorities_top_k),
+                     sd_prop_min = sd(prop_all_minorities_top_k),
+                     n_prop_min = n())%>%
+  dplyr::mutate(se_prop_min = sd_prop_min / sqrt(n_prop_min),
+             lower_ci = mean_prop_min_top_k - qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min,
+             upper_ci = mean_prop_min_top_k + qt(1 - (0.05 / 2), n_prop_min - 1)* se_prop_min)
 
 covert_sweep_3$scenario <- "Scenario 3"
 
@@ -789,30 +933,90 @@ data_lines_combined$prop_min <- paste0(paste0("Minority ", data_lines_combined$p
 ```
 
 Plot the scenario comparison:
-```{r warning = F, fig.width = 10, fig.height = 5}
+```{r warning = F, fig.width = 10, fig.height = 7}
 
 # plot
 (plot_scenarios <- combined_covert_scenarios %>%
-    ggplot(., aes(x=prop_covert, y=prop_all_minorities_top_k)) +
-    geom_line(aes(color = scenario), size = 1.2)+
-    facet_wrap(~ as.factor(prop_min))+
-    geom_hline(data = data_lines_combined,
+   ggplot(., aes(x=prop_covert, y=mean_prop_min_top_k)) +
+   geom_line(aes(color = scenario), size = 1.2)+
+   #geom_errorbar(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
+   facet_wrap(~ as.factor(prop_min))+
+   geom_hline(data = data_lines_combined,
              aes(yintercept = hline),
              linetype="dashed")+
-    labs(
+   labs(
       title = "Effect of the increase in the % of covert per minority member in top 5% of the nodes ",
       y = "% in top 5% of the nodes",
       x = "Proportion covert",
       x.axis.text=element_text(size=12),
       y.axis.title=element_text(size=14,face="bold")
       ) +
-    theme_bw()+
-    theme(
+   theme_bw()+
+   theme(
           strip.text.x = element_text(size = 13),
           axis.text.x = element_text(size = 10),
           axis.text.y = element_text(size = 10),
           axis.title.x = element_text(size = 12),
           axis.title.y = element_text(size = 12)))
     
+```
+
+Print out:
+```{r}
+png(filename = "Plots/small_n_incorporated_3_scenarios_ci.png",
+    width = 10, height = 7, units = "in", res = 600)
+
+combined_covert_scenarios %>%
+   ggplot(., aes(x=prop_covert, y=mean_prop_min_top_k)) +
+   geom_line(aes(color = scenario), size = 1.2)+
+   geom_errorbar(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
+   facet_wrap(~ as.factor(prop_min))+
+   geom_hline(data = data_lines_combined,
+             aes(yintercept = hline),
+             linetype="dashed")+
+   labs(
+      title = "Effect of the increase in the % of covert per minority member in top 5% of the nodes ",
+      y = "% in top 5% of the nodes",
+      x = "Proportion covert",
+      x.axis.text=element_text(size=12),
+      y.axis.title=element_text(size=14,face="bold")
+      ) +
+   theme_bw()+
+   theme(
+          strip.text.x = element_text(size = 13),
+          axis.text.x = element_text(size = 10),
+          axis.text.y = element_text(size = 10),
+          axis.title.x = element_text(size = 12),
+          axis.title.y = element_text(size = 12))
+
+dev.off()
+
+png(filename = "Plots/small_n_incorporated_3_scenarios.png",
+    width = 10, height = 7, units = "in", res = 600)
+
+combined_covert_scenarios %>%
+   ggplot(., aes(x=prop_covert, y=mean_prop_min_top_k)) +
+   geom_line(aes(color = scenario), size = 1.2)+
+   #geom_errorbar(aes(ymin=lower_ci, ymax=upper_ci), color = "grey40", width = .01)+
+   facet_wrap(~ as.factor(prop_min))+
+   geom_hline(data = data_lines_combined,
+             aes(yintercept = hline),
+             linetype="dashed")+
+   labs(
+      title = "Effect of the increase in the % of covert per minority member in top 5% of the nodes ",
+      y = "% in top 5% of the nodes",
+      x = "Proportion covert",
+      x.axis.text=element_text(size=12),
+      y.axis.title=element_text(size=14,face="bold")
+      ) +
+   theme_bw()+
+   theme(
+          strip.text.x = element_text(size = 13),
+          axis.text.x = element_text(size = 10),
+          axis.text.y = element_text(size = 10),
+          axis.title.x = element_text(size = 12),
+          axis.title.y = element_text(size = 12))
+
+dev.off()
 ```
 
